@@ -68,3 +68,14 @@
 
 ## Bug Fixes
 - [x] Fix crypto.getRandomValues() error in uuidv4() — implement React Native-compatible UUID generator
+
+
+## Known Issues
+- [x] Navigation errors when clicking on notes/code files/folders (added defensive checks and store initialization)
+
+## New Features (AI App Builder)
+- [ ] AI can generate Android apps (React Native/Expo projects)
+- [ ] AI can generate websites (HTML/CSS/JavaScript)
+- [ ] Generated apps can be built and downloaded as APK
+- [ ] Generated websites can be previewed in-app
+- [ ] App/website generation via AI chat interface

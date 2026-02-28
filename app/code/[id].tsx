@@ -107,8 +107,10 @@ export default function CodeEditorScreen() {
       setTitle(item.title);
       setContent(item.content);
       setLanguage(item.language ?? "javascript");
+    } else if (id) {
+      console.warn(`Code file with id ${id} not found`);
     }
-  }, [id]);
+  }, [id, item]);
 
   const scheduleSave = (newTitle: string, newContent: string, newLang: string) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -139,7 +141,16 @@ export default function CodeEditorScreen() {
   if (!item) {
     return (
       <ScreenContainer>
-        <Text style={{ color: colors.muted, textAlign: "center", marginTop: 40 }}>File not found</Text>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 12 }}>
+          <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: "600" }}>File not found</Text>
+          <Text style={{ color: colors.muted, fontSize: 14, textAlign: "center" }}>ID: {id}</Text>
+          <TouchableOpacity
+            style={{ marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: colors.primary, borderRadius: 8 }}
+            onPress={() => router.back()}
+          >
+            <Text style={{ color: "#fff", fontWeight: "600" }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
       </ScreenContainer>
     );
   }
