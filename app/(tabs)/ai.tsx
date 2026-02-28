@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -18,6 +19,7 @@ import { useColors } from "@/hooks/use-colors";
 import { navToCode, navToEditor } from "@/lib/nav";
 import { trpc } from "@/lib/trpc";
 import { NoteItem, useNotesStore } from "@/store/notes-store";
+import { useGeneratedAppsStore } from "@/store/generated-apps-store";
 
 interface Message {
   id: string;
@@ -42,16 +44,23 @@ const SUGGESTIONS = [
   "Create a note about the SOLID principles with examples",
   "Set up a Python data analysis project structure",
   "Explain how [[wiki links]] work in this app",
+  "Generate a todo list Android app",
+  "Generate a weather website",
+  "Create a calculator app",
 ];
 
 export default function AIScreen() {
   const colors = useColors();
+  const router = useRouter();
   const { items, createItem, updateItem } = useNotesStore();
+  const { addApp } = useGeneratedAppsStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const chatMutation = trpc.ai.chat.useMutation();
+  const generateAppMutation = trpc.ai.generateApp.useMutation();
+  const generateWebsiteMutation = trpc.ai.generateWebsite.useMutation();
 
   const notesContext = items.map((i) => ({
     id: i.id,

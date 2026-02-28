@@ -79,3 +79,12 @@
 - [ ] Generated apps can be built and downloaded as APK
 - [ ] Generated websites can be previewed in-app
 - [ ] App/website generation via AI chat interface
+
+
+## In Progress: AI App Builder
+- [x] Backend AI router for React Native app generation
+- [x] Backend AI router for website generation
+- [x] App/website preview screen with WebView
+- [x] Generated projects stored in explorer
+- [ ] Build UI with Expo integration
+- [ ] Download APK functionality

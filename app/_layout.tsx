@@ -21,6 +21,7 @@ import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-run
 import { useNotesStore } from "@/store/notes-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useGitHubStore } from "@/store/github-store";
+import { useGeneratedAppsStore } from "@/store/generated-apps-store";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -48,6 +49,7 @@ export default function RootLayout() {
         await useNotesStore.getState().load();
         await useSettingsStore.getState().load();
         await useGitHubStore.getState().load();
+        await useGeneratedAppsStore.getState().load();
       } catch (e) {
         console.error("Failed to initialize stores:", e);
       }
@@ -107,6 +109,7 @@ export default function RootLayout() {
             <Stack.Screen name="oauth/callback" />
             <Stack.Screen name="editor/[id]" />
             <Stack.Screen name="code/[id]" />
+            <Stack.Screen name="preview/[id]" />
           </Stack>
           <StatusBar style="auto" />
         </QueryClientProvider>
