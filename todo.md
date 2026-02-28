@@ -64,3 +64,7 @@
 - [x] App icon generated
 - [x] Theme colors updated
 - [x] App name set to "Notewise"
+
+
+## Bug Fixes
+- [x] Fix crypto.getRandomValues() error in uuidv4() — implement React Native-compatible UUID generator

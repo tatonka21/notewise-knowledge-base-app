@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { v4 as uuidv4 } from "uuid";
+import { generateUUID } from "../lib/uuid";
 import { create } from "zustand";
 
 export type ItemType = "note" | "code" | "folder";
@@ -67,7 +67,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       } else {
         // Seed with welcome note
         const welcome: NoteItem = {
-          id: uuidv4(),
+          id: generateUUID(),
           type: "note",
           title: "Welcome to Notewise",
           content: `# Welcome to Notewise 🧠\n\nThis is your personal knowledge base.\n\n## Features\n- **Wiki-style links**: Type \`[[\` to link to another note\n- **AI Assistant**: Ask the AI to create notes and folders\n- **Code Editor**: Monaco-powered syntax highlighting\n- **GitHub Sync**: Push your notes to a GitHub repo\n\n## Getting Started\nCreate your first note using the **+** button, or ask the AI to set up your knowledge base!\n`,
@@ -78,7 +78,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
           updatedAt: Date.now(),
         };
         const gettingStarted: NoteItem = {
-          id: uuidv4(),
+          id: generateUUID(),
           type: "note",
           title: "Getting Started",
           content: `# Getting Started\n\nSee [[Welcome to Notewise]] for an overview.\n\n## Creating Notes\nTap the **+** button on the Notes tab.\n\n## Linking Notes\nType \`[[\` anywhere in a note to get a list of existing notes to link to.\n\n## Code Files\nCreate a code file from the **+** menu to get syntax-highlighted editing.\n`,
@@ -109,7 +109,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
   createItem: (data) => {
     const item: NoteItem = {
-      id: uuidv4(),
+      id: generateUUID(),
       type: data.type,
       title: data.title,
       content: data.content ?? (data.type === "folder" ? "" : `# ${data.title}\n\n`),

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { extractWikiLinks } from "../store/notes-store";
+import { generateUUID } from "../lib/uuid";
 
 describe("extractWikiLinks", () => {
   it("extracts single wiki link", () => {
