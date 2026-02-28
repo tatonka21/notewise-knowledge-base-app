@@ -1,0 +1,503 @@
+import { useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+import { ScreenContainer } from "@/components/screen-container";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useColors } from "@/hooks/use-colors";
+import { navToCode, navToEditor } from "@/lib/nav";
+import { trpc } from "@/lib/trpc";
+import { NoteItem, useNotesStore } from "@/store/notes-store";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  actions?: AiAction[];
+  createdItems?: NoteItem[];
+}
+
+interface AiAction {
+  action: string;
+  title?: string;
+  content?: string;
+  parentId?: string | null;
+  language?: string;
+  id?: string;
+}
+
+const SUGGESTIONS = [
+  "Create a folder called 'React' with notes for hooks, state, and props",
+  "Write a TypeScript utility function for debouncing",
+  "Create a note about the SOLID principles with examples",
+  "Set up a Python data analysis project structure",
+  "Explain how [[wiki links]] work in this app",
+];
+
+export default function AIScreen() {
+  const colors = useColors();
+  const { items, createItem, updateItem } = useNotesStore();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const chatMutation = trpc.ai.chat.useMutation();
+
+  const notesContext = items.map((i) => ({
+    id: i.id,
+    title: i.title,
+    type: i.type,
+    parentId: i.parentId,
+  }));
+
+  const executeActions = (actions: AiAction[]): NoteItem[] => {
+    const created: NoteItem[] = [];
+    const idMap: Record<string, string> = {};
+
+    for (const act of actions) {
+      if (act.action === "create_folder") {
+        const parentId = act.parentId ? (idMap[act.parentId] ?? act.parentId) : null;
+        const item = createItem({
+          title: act.title ?? "New Folder",
+          type: "folder",
+          parentId,
+        });
+        if (act.title) idMap[act.title] = item.id;
+        created.push(item);
+      } else if (act.action === "create_note") {
+        const parentId = act.parentId ? (idMap[act.parentId] ?? act.parentId) : null;
+        const item = createItem({
+          title: act.title ?? "Untitled Note",
+          type: "note",
+          content: act.content ?? `# ${act.title ?? "Untitled"}\n\n`,
+          parentId,
+        });
+        if (act.title) idMap[act.title] = item.id;
+        created.push(item);
+      } else if (act.action === "create_code") {
+        const parentId = act.parentId ? (idMap[act.parentId] ?? act.parentId) : null;
+        const item = createItem({
+          title: act.title ?? "Untitled Code",
+          type: "code",
+          content: act.content ?? "",
+          language: act.language ?? "javascript",
+          parentId,
+        });
+        if (act.title) idMap[act.title] = item.id;
+        created.push(item);
+      } else if (act.action === "update_note" && act.id) {
+        updateItem(act.id, { content: act.content });
+      }
+    }
+    return created;
+  };
+
+  const sendMessage = async (text?: string) => {
+    const messageText = (text ?? input).trim();
+    if (!messageText || isLoading) return;
+
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: messageText,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setIsLoading(true);
+
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+
+    try {
+      const history = [...messages, userMsg].map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      const result = await chatMutation.mutateAsync({
+        messages: history,
+        notesContext,
+      });
+
+      const createdItems = result.actions ? executeActions(result.actions) : [];
+
+      const assistantMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: result.text,
+        actions: result.actions,
+        createdItems,
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch (err) {
+      const errMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Sorry, I encountered an error. Please try again.",
+      };
+      setMessages((prev) => [...prev, errMsg]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderMessage = ({ item: msg }: { item: Message }) => {
+    const isUser = msg.role === "user";
+    return (
+      <View style={[styles.messageRow, isUser && styles.messageRowUser]}>
+        {!isUser && (
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+            <IconSymbol name="sparkles" size={14} color="#fff" />
+          </View>
+        )}
+        <View style={[
+          styles.bubble,
+          isUser
+            ? [styles.userBubble, { backgroundColor: colors.primary }]
+            : [styles.aiBubble, { backgroundColor: colors.surface, borderColor: colors.border }],
+        ]}>
+          <Text style={[styles.bubbleText, { color: isUser ? "#fff" : colors.foreground }]}>
+            {msg.content}
+          </Text>
+
+          {/* Created items */}
+          {msg.createdItems && msg.createdItems.length > 0 && (
+            <View style={[styles.createdItems, { borderTopColor: colors.border }]}>
+              <Text style={[styles.createdLabel, { color: colors.muted }]}>
+                Created {msg.createdItems.length} item{msg.createdItems.length !== 1 ? "s" : ""}:
+              </Text>
+              {msg.createdItems.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.createdItem}
+                  onPress={() => {
+                    if (item.type === "code") navToCode(item.id);
+                    else if (item.type !== "folder") navToEditor(item.id);
+                  }}
+                >
+                  <IconSymbol
+                    name={
+                      item.type === "folder"
+                        ? "folder.fill"
+                        : item.type === "code"
+                        ? "chevron.left.forwardslash.chevron.right"
+                        : "doc.text.fill"
+                    }
+                    size={12}
+                    color={
+                      item.type === "folder"
+                        ? colors.warning
+                        : item.type === "code"
+                        ? (colors as Record<string, string>).accent ?? colors.primary
+                        : colors.primary
+                    }
+                  />
+                  <Text style={[styles.createdItemText, { color: colors.primary }]}>
+                    {item.title}
+                  </Text>
+                  {item.type !== "folder" && (
+                    <IconSymbol name="arrow.up.right" size={10} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <ScreenContainer containerClassName="bg-background" edges={["top", "left", "right"]}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={[styles.aiIcon, { backgroundColor: colors.primary }]}>
+          <IconSymbol name="sparkles" size={18} color="#fff" />
+        </View>
+        <View>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notewise AI</Text>
+          <Text style={[styles.headerSub, { color: colors.muted }]}>
+            Create notes, folders, and code
+          </Text>
+        </View>
+        {messages.length > 0 && (
+          <TouchableOpacity
+            style={styles.clearBtn}
+            onPress={() => setMessages([])}
+          >
+            <IconSymbol name="trash.fill" size={16} color={colors.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+      >
+        {/* Messages */}
+        {messages.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.primary + "22" }]}>
+              <IconSymbol name="brain" size={40} color={colors.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+              Ask me anything
+            </Text>
+            <Text style={[styles.emptyDesc, { color: colors.muted }]}>
+              I can create notes, folders, and code files in your knowledge base. I understand wiki-style links and can write in any programming language.
+            </Text>
+            <View style={styles.suggestions}>
+              {SUGGESTIONS.map((s, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.suggestion, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => sendMessage(s)}
+                >
+                  <Text style={[styles.suggestionText, { color: colors.foreground }]} numberOfLines={2}>
+                    {s}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(m) => m.id}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.messageList}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          />
+        )}
+
+        {/* Loading indicator */}
+        {isLoading && (
+          <View style={[styles.loadingRow, { borderTopColor: colors.border }]}>
+            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+              <IconSymbol name="sparkles" size={14} color="#fff" />
+            </View>
+            <View style={[styles.loadingBubble, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.muted }]}>Thinking...</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Input */}
+        <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <TextInput
+            style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Ask AI to create notes, write code..."
+            placeholderTextColor={colors.muted}
+            multiline
+            maxLength={2000}
+            returnKeyType="default"
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, { backgroundColor: input.trim() && !isLoading ? colors.primary : colors.border }]}
+            onPress={() => sendMessage()}
+            disabled={!input.trim() || isLoading}
+          >
+            <IconSymbol name="paperplane.fill" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </ScreenContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 0.5,
+    gap: 12,
+  },
+  aiIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  headerSub: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  clearBtn: {
+    marginLeft: "auto",
+    padding: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 40,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  emptyDesc: {
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  suggestions: {
+    width: "100%",
+    gap: 8,
+  },
+  suggestion: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  suggestionText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  messageList: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    paddingBottom: 8,
+  },
+  messageRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 12,
+  },
+  messageRowUser: {
+    flexDirection: "row-reverse",
+  },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+    flexShrink: 0,
+  },
+  bubble: {
+    maxWidth: "80%",
+    borderRadius: 16,
+    padding: 12,
+  },
+  userBubble: {
+    borderBottomRightRadius: 4,
+  },
+  aiBubble: {
+    borderWidth: 1,
+    borderBottomLeftRadius: 4,
+  },
+  bubbleText: {
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  createdItems: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+    gap: 6,
+  },
+  createdLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  createdItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  createdItemText: {
+    fontSize: 13,
+    fontWeight: "500",
+    flex: 1,
+  },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 0.5,
+  },
+  loadingBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  loadingText: {
+    fontSize: 13,
+    fontStyle: "italic",
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 0.5,
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 15,
+    maxHeight: 100,
+    lineHeight: 20,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+});
