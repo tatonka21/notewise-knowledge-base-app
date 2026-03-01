@@ -26,3 +26,8 @@ export function navToNote(item: { id: string; type: string }) {
     navToEditor(item.id);
   }
 }
+
+export function navToPreview(id: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  router.push({ pathname: "/preview/[id]" as any, params: { id } });
+}

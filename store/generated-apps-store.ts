@@ -21,7 +21,7 @@ interface GeneratedAppsState {
   loaded: boolean;
   load: () => Promise<void>;
   save: () => Promise<void>;
-  addApp: (app: Omit<GeneratedApp, "id" | "createdAt" | "updatedAt">) => void;
+  addApp: (app: Omit<GeneratedApp, "id" | "createdAt" | "updatedAt">) => GeneratedApp;
   deleteApp: (id: string) => void;
   updateApp: (id: string, updates: Partial<GeneratedApp>) => void;
   getApp: (id: string) => GeneratedApp | undefined;
@@ -69,6 +69,7 @@ export const useGeneratedAppsStore = create<GeneratedAppsState>((set, get) => ({
       state.save();
       return { apps };
     });
+    return newApp;
   },
 
   deleteApp: (id) => {
