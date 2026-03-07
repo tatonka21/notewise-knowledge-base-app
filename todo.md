@@ -74,11 +74,11 @@
 - [x] Navigation errors when clicking on notes/code files/folders (added defensive checks and store initialization)
 
 ## New Features (AI App Builder)
-- [ ] AI can generate Android apps (React Native/Expo projects)
-- [ ] AI can generate websites (HTML/CSS/JavaScript)
-- [ ] Generated apps can be built and downloaded as APK
-- [ ] Generated websites can be previewed in-app
-- [ ] App/website generation via AI chat interface
+- [x] AI can generate Android apps (React Native/Expo projects)
+- [x] AI can generate websites (HTML/CSS/JavaScript)
+- [x] Generated apps can be built and downloaded as APK
+- [x] Generated websites can be previewed in-app
+- [x] App/website generation via AI chat interface
 
 
 ## In Progress: AI App Builder
@@ -86,5 +86,5 @@
 - [x] Backend AI router for website generation
 - [x] App/website preview screen with WebView
 - [x] Generated projects stored in explorer
-- [ ] Build UI with Expo integration
-- [ ] Download APK functionality
+- [x] Build UI with Expo integration
+- [x] Download APK functionality

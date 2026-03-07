@@ -16,7 +16,7 @@ import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
-import { navToCode, navToEditor } from "@/lib/nav";
+import { navToCode, navToEditor, navToPreview } from "@/lib/nav";
 import { trpc } from "@/lib/trpc";
 import { NoteItem, useNotesStore } from "@/store/notes-store";
 import { useGeneratedAppsStore } from "@/store/generated-apps-store";
@@ -27,6 +27,7 @@ interface Message {
   content: string;
   actions?: AiAction[];
   createdItems?: NoteItem[];
+  generatedApp?: { id: string; name: string; type: "app" | "website" };
 }
 
 interface AiAction {
@@ -127,6 +128,88 @@ export default function AIScreen() {
 
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
+    // Detect app/website generation intent — website check must come first so
+    // phrases like "generate a web app" are routed to website generation.
+    const isWebsiteGenRequest = /(?:generate|create|build|make)\s+(?:a\s+|an\s+)?(?:website|web\s+app|webpage|landing\s+page|web\s+site)\b/i.test(messageText);
+    const isAppGenRequest = !isWebsiteGenRequest && /(?:generate|create|build|make)\s+(?:a\s+|an\s+)?(?:react\s+native\s+|expo\s+|android\s+|mobile\s+)?app\b/i.test(messageText);
+
+    if (isAppGenRequest || isWebsiteGenRequest) {
+      try {
+        // Extract a name from the message
+        const nameMatch = messageText.match(/(?:called|named)\s+["']?([^"'\n,]+?)["']?(?:\s+(?:with|that|using|for|which)|[,.]|$)/i);
+        const fallbackName = messageText
+          .replace(/^(?:generate|create|build|make)\s+(?:a|an|the)?\s*/i, "")
+          .replace(/\b(?:react native|expo|android|mobile)\s+app\b/gi, "app")
+          .replace(/\b(?:website|web app|webpage|landing page)\b/gi, "site")
+          .replace(/\s+/g, " ")
+          .trim()
+          .split(" ")
+          .slice(0, 4)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ") || (isAppGenRequest ? "My App" : "My Website");
+        const name = nameMatch ? nameMatch[1].trim() : fallbackName;
+
+        if (isWebsiteGenRequest) {
+          const result = await generateWebsiteMutation.mutateAsync({
+            description: messageText,
+            siteName: name,
+          });
+          if (result.success && result.website) {
+            const newApp = addApp({
+              type: "website",
+              name,
+              description: messageText,
+              code: result.website.html ?? "",
+              preview: result.website.html,
+            });
+            const assistantMsg: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: `I've generated the website "${name}"! Tap below to preview it.`,
+              generatedApp: { id: newApp.id, name, type: "website" },
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+          } else {
+            throw new Error(result.error ?? "Website generation failed");
+          }
+        } else {
+          const result = await generateAppMutation.mutateAsync({
+            description: messageText,
+            appName: name,
+          });
+          if (result.success && result.app) {
+            const newApp = addApp({
+              type: "app",
+              name,
+              description: messageText,
+              code: result.app.mainFile ?? "",
+            });
+            const assistantMsg: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: `I've generated the React Native app "${name}"! Tap below to view the code and build options.`,
+              generatedApp: { id: newApp.id, name, type: "app" },
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+          } else {
+            throw new Error(result.error ?? "App generation failed");
+          }
+        }
+
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      } catch (err) {
+        const errMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Sorry, I encountered an error generating that. Please try again.",
+        };
+        setMessages((prev) => [...prev, errMsg]);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     try {
       const history = [...messages, userMsg].map((m) => ({
         role: m.role as "user" | "assistant",
@@ -180,6 +263,24 @@ export default function AIScreen() {
           <Text style={[styles.bubbleText, { color: isUser ? "#fff" : colors.foreground }]}>
             {msg.content}
           </Text>
+
+          {/* Generated app/website link */}
+          {msg.generatedApp && (
+            <TouchableOpacity
+              style={[styles.generatedAppLink, { backgroundColor: colors.primary + "22", borderColor: colors.primary + "44" }]}
+              onPress={() => navToPreview(msg.generatedApp!.id)}
+            >
+              <IconSymbol
+                name={msg.generatedApp.type === "website" ? "globe" : "iphone"}
+                size={16}
+                color={colors.primary}
+              />
+              <Text style={[styles.generatedAppText, { color: colors.primary }]}>
+                {msg.generatedApp.type === "website" ? "Preview Website" : "View App"}: {msg.generatedApp.name}
+              </Text>
+              <IconSymbol name="arrow.up.right" size={12} color={colors.primary} />
+            </TouchableOpacity>
+          )}
 
           {/* Created items */}
           {msg.createdItems && msg.createdItems.length > 0 && (
@@ -460,6 +561,21 @@ const styles = StyleSheet.create({
   createdItemText: {
     fontSize: 13,
     fontWeight: "500",
+    flex: 1,
+  },
+  generatedAppLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  generatedAppText: {
+    fontSize: 13,
+    fontWeight: "600",
     flex: 1,
   },
   loadingRow: {

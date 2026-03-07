@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -72,11 +73,16 @@ export default function PreviewScreen() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (app.apkUrl) {
-      // Open APK URL
-      if (Platform.OS === "web") {
-        window.open(app.apkUrl, "_blank");
+      try {
+        await Linking.openURL(app.apkUrl);
+      } catch (err) {
+        console.error("Failed to open APK URL:", err);
+        // If Linking fails, fall back to window.open on web
+        if (Platform.OS === "web") {
+          window.open(app.apkUrl, "_blank");
+        }
       }
     }
   };
