@@ -25,4 +25,19 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+export const generatedApps = mysqlTable("generatedApps", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  type: mysqlEnum("type", ["app", "website"]).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  code: text("code").notNull(),
+  preview: text("preview"),
+  buildStatus: mysqlEnum("buildStatus", ["idle", "building", "success", "error"]).default("idle"),
+  buildError: text("buildError"),
+  apkUrl: text("apkUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type GeneratedAppRecord = typeof generatedApps.$inferSelect;
+export type InsertGeneratedApp = typeof generatedApps.$inferInsert;
