@@ -1,0 +1,80 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile (preview or production)"
+        required: false
+        default: "preview"
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    # For PRs, only run when they are merged (not just closed)
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    permissions:
+      contents: write   # needed to attach APK to GitHub Releases
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up Expo / EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Determine build profile
+        id: profile
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "profile=${{ github.event.inputs.profile }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            echo "profile=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "profile=preview" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Android APK with EAS
+        run: |
+          eas build \
+            --platform android \
+            --profile ${{ steps.profile.outputs.profile }} \
+            --non-interactive \
+            --output ./notewise.apk
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notewise-android-${{ steps.profile.outputs.profile }}-${{ github.sha }}
+          path: "*.apk"
+          retention-days: 30
+
+      - name: Attach APK to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.apk"
