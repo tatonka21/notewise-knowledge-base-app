@@ -51,8 +51,8 @@ interface Message {
   content: string;
   actions?: AiAction[];
   createdItems?: NoteItem[];
-  deviceOutcomes?: DeviceActionOutcome[];
   generatedApp?: { id: string; name: string; type: "app" | "website" };
+  deviceOutcomes?: DeviceActionOutcome[];
 }
 
 interface AiAction {
