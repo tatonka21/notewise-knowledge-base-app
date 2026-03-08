@@ -4,6 +4,42 @@ Welcome! This guide explains how to install the **NoteWise AI App Builder** on y
 
 ---
 
+## ⚡ Step 0 — Build the APK First (one-time, ~20 minutes)
+
+The APK is built automatically by GitHub — you just need to kick off the build once.
+**You do not need Android Studio, a computer, or any technical knowledge.**
+
+### Option 1 — Trigger the build manually right now (fastest)
+
+> No need to merge anything — this works immediately.
+
+1. Open this link on any device:  
+   **<https://github.com/tatonka21/notewise-knowledge-base-app/actions/workflows/build-android.yml>**
+2. Click the **"Run workflow"** button (top-right of the runs list).
+3. Leave all settings as-is and click the green **"Run workflow"** button.
+4. A new row appears — wait for the ✅ green checkmark (~15–25 minutes).
+5. Click the completed run, scroll down to **Artifacts**, and click  
+   **`notewise-android-<sha>`** to download a `.zip` file.
+6. Unzip it — you get `notewise.apk`. Jump to **Step 1** below to install it.
+
+---
+
+### Option 2 — Merge the ready-made pull request (permanent fix)
+
+> This also fixes the build for all future code changes.
+
+1. Open pull request **#3**:  
+   **<https://github.com/tatonka21/notewise-knowledge-base-app/pull/3>**
+2. Scroll to the bottom and click **"Ready for review"** (converts it from Draft).
+3. Click **"Merge pull request"** → **"Confirm merge"**.
+4. Go to **Actions**:  
+   **<https://github.com/tatonka21/notewise-knowledge-base-app/actions>**  
+   A build starts automatically. Wait for the ✅ green checkmark (~15–25 minutes).
+5. Click the completed run, scroll to **Artifacts**, download  
+   **`notewise-android-<sha>`**, unzip → `notewise.apk`.
+
+---
+
 ## Option A — Download from GitHub Releases (Easiest)
 
 1. **Open the Releases page** on your phone's browser:
