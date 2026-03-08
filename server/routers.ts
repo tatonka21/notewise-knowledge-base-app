@@ -39,7 +39,7 @@ export const appRouter = router({
           ).optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { messages, notesContext } = input;
 
         const notesContextStr = notesContext && notesContext.length > 0
@@ -55,7 +55,7 @@ export const appRouter = router({
             { role: "system", content: systemPrompt },
             ...messages,
           ],
-        });
+        }, ctx.userApiKey);
 
         const content = (response.choices[0]?.message?.content as string) ?? "";
 
@@ -89,7 +89,7 @@ export const appRouter = router({
           appName: z.string(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { description, appName } = input;
 
         const prompt = `You are an expert React Native developer. Generate a complete, production-ready React Native app based on this description:
@@ -126,7 +126,7 @@ Make sure:
           messages: [
             { role: "user", content: prompt },
           ],
-        });
+        }, ctx.userApiKey);
 
         const content = (response.choices[0]?.message?.content as string) ?? "";
         
@@ -146,7 +146,7 @@ Make sure:
           siteName: z.string(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { description, siteName } = input;
 
         const prompt = `You are an expert web developer. Generate a complete, modern website based on this description:
@@ -181,7 +181,7 @@ Make sure:
           messages: [
             { role: "user", content: prompt },
           ],
-        });
+        }, ctx.userApiKey);
 
         const content = (response.choices[0]?.message?.content as string) ?? "";
         
