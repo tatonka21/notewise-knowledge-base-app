@@ -50,9 +50,9 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   actions?: AiAction[];
+  deviceOutcomes?: DeviceActionOutcome[];
   createdItems?: NoteItem[];
   generatedApp?: { id: string; name: string; type: "app" | "website" };
-  deviceOutcomes?: DeviceActionOutcome[];
 }
 
 interface AiAction {
