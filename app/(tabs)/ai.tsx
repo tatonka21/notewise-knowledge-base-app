@@ -18,8 +18,25 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { navToCode, navToEditor } from "@/lib/nav";
 import { trpc } from "@/lib/trpc";
+import {
+  launchApp,
+  makeCall,
+  openMaps,
+  openSettings,
+  openUrl,
+  sendEmail,
+  sendSms,
+  shareText,
+  type DeviceActionResult,
+} from "@/lib/device-actions";
 import { NoteItem, useNotesStore } from "@/store/notes-store";
 import { useGeneratedAppsStore } from "@/store/generated-apps-store";
+
+interface DeviceActionOutcome {
+  title: string;
+  success: boolean;
+  message: string;
+}
 
 interface Message {
   id: string;
@@ -27,6 +44,7 @@ interface Message {
   content: string;
   actions?: AiAction[];
   createdItems?: NoteItem[];
+  deviceOutcomes?: DeviceActionOutcome[];
 }
 
 interface AiAction {
@@ -36,17 +54,26 @@ interface AiAction {
   parentId?: string | null;
   language?: string;
   id?: string;
+  // device-action fields
+  url?: string;
+  phone?: string;
+  body?: string;
+  to?: string;
+  subject?: string;
+  text?: string;
+  query?: string;
+  path?: string;
 }
 
 const SUGGESTIONS = [
   "Create a folder called 'React' with notes for hooks, state, and props",
   "Write a TypeScript utility function for debouncing",
-  "Create a note about the SOLID principles with examples",
-  "Set up a Python data analysis project structure",
-  "Explain how [[wiki links]] work in this app",
+  "Open YouTube on my phone",
+  "Open Google Maps and search for coffee shops near me",
+  "Open my phone's Wi-Fi settings",
+  "Share the text 'Hello from Notewise!' to another app",
   "Generate a todo list Android app",
   "Generate a weather website",
-  "Create a calculator app",
 ];
 
 export default function AIScreen() {
@@ -69,11 +96,15 @@ export default function AIScreen() {
     parentId: i.parentId,
   }));
 
-  const executeActions = (actions: AiAction[]): NoteItem[] => {
+  const executeActions = async (
+    actions: AiAction[],
+  ): Promise<{ createdItems: NoteItem[]; deviceOutcomes: DeviceActionOutcome[] }> => {
     const created: NoteItem[] = [];
+    const outcomes: DeviceActionOutcome[] = [];
     const idMap: Record<string, string> = {};
 
     for (const act of actions) {
+      // ── Knowledge-base actions ────────────────────────────────────────
       if (act.action === "create_folder") {
         const parentId = act.parentId ? (idMap[act.parentId] ?? act.parentId) : null;
         const item = createItem({
@@ -106,9 +137,35 @@ export default function AIScreen() {
         created.push(item);
       } else if (act.action === "update_note" && act.id) {
         updateItem(act.id, { content: act.content });
+
+      // ── Device actions ────────────────────────────────────────────────
+      } else if (act.action === "open_url" && act.url) {
+        const result = await openUrl(act.url);
+        outcomes.push({ title: act.title ?? act.url, ...result });
+      } else if (act.action === "launch_app" && act.url) {
+        const result = await launchApp(act.url);
+        outcomes.push({ title: act.title ?? act.url, ...result });
+      } else if (act.action === "make_call" && act.phone) {
+        const result = await makeCall(act.phone);
+        outcomes.push({ title: act.title ?? `Call ${act.phone}`, ...result });
+      } else if (act.action === "send_sms" && act.phone) {
+        const result = await sendSms(act.phone, act.body);
+        outcomes.push({ title: act.title ?? `SMS ${act.phone}`, ...result });
+      } else if (act.action === "send_email" && act.to) {
+        const result = await sendEmail(act.to, act.subject, act.body);
+        outcomes.push({ title: act.title ?? `Email ${act.to}`, ...result });
+      } else if (act.action === "share_text" && act.text) {
+        const result = await shareText(act.text, act.title);
+        outcomes.push({ title: act.title ?? "Share", ...result });
+      } else if (act.action === "open_maps" && act.query) {
+        const result = await openMaps(act.query);
+        outcomes.push({ title: act.title ?? act.query, ...result });
+      } else if (act.action === "open_settings") {
+        const result = await openSettings(act.path);
+        outcomes.push({ title: act.title ?? "Settings", ...result });
       }
     }
-    return created;
+    return { createdItems: created, deviceOutcomes: outcomes };
   };
 
   const sendMessage = async (text?: string) => {
@@ -138,7 +195,7 @@ export default function AIScreen() {
         notesContext,
       });
 
-      const createdItems = result.actions ? executeActions(result.actions) : [];
+      const { createdItems, deviceOutcomes } = await executeActions(result.actions ?? []);
 
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -146,6 +203,7 @@ export default function AIScreen() {
         content: result.text,
         actions: result.actions,
         createdItems,
+        deviceOutcomes,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -223,6 +281,27 @@ export default function AIScreen() {
               ))}
             </View>
           )}
+
+          {/* Device action outcomes */}
+          {msg.deviceOutcomes && msg.deviceOutcomes.length > 0 && (
+            <View style={[styles.createdItems, { borderTopColor: colors.border }]}>
+              <Text style={[styles.createdLabel, { color: colors.muted }]}>
+                Device actions:
+              </Text>
+              {msg.deviceOutcomes.map((outcome, idx) => (
+                <View key={idx} style={styles.createdItem}>
+                  <IconSymbol
+                    name={outcome.success ? "checkmark.circle.fill" : "xmark.circle.fill"}
+                    size={12}
+                    color={outcome.success ? "#22c55e" : "#ef4444"}
+                  />
+                  <Text style={[styles.createdItemText, { color: outcome.success ? "#22c55e" : "#ef4444" }]}>
+                    {outcome.title}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </View>
     );
@@ -238,7 +317,7 @@ export default function AIScreen() {
         <View>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notewise AI</Text>
           <Text style={[styles.headerSub, { color: colors.muted }]}>
-            Create notes, folders, and code
+            Create notes, control your device
           </Text>
         </View>
         {messages.length > 0 && (
@@ -266,7 +345,7 @@ export default function AIScreen() {
               Ask me anything
             </Text>
             <Text style={[styles.emptyDesc, { color: colors.muted }]}>
-              I can create notes, folders, and code files in your knowledge base. I understand wiki-style links and can write in any programming language.
+              I can create notes, folders, and code files. I can also open apps, search maps, share content, open URLs, call and message — just ask!
             </Text>
             <View style={styles.suggestions}>
               {SUGGESTIONS.map((s, i) => (
