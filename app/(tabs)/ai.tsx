@@ -29,13 +29,20 @@ import {
   shareText,
   type DeviceActionResult,
 } from "@/lib/device-actions";
+import {
+  commitFiles,
+  createBranch,
+  readFile,
+} from "@/lib/github-actions";
 import { NoteItem, useNotesStore } from "@/store/notes-store";
 import { useGeneratedAppsStore } from "@/store/generated-apps-store";
+import { useGitHubStore } from "@/store/github-store";
 
 interface DeviceActionOutcome {
   title: string;
   success: boolean;
   message: string;
+  detail?: string;
 }
 
 interface Message {
@@ -63,6 +70,11 @@ interface AiAction {
   text?: string;
   query?: string;
   path?: string;
+  // github-action fields
+  files?: Array<{ path: string; content: string }>;
+  message?: string;
+  branch?: string;
+  fromBranch?: string;
 }
 
 const SUGGESTIONS = [
@@ -70,9 +82,9 @@ const SUGGESTIONS = [
   "Write a TypeScript utility function for debouncing",
   "Open YouTube on my phone",
   "Open Google Maps and search for coffee shops near me",
-  "Open my phone's Wi-Fi settings",
-  "Share the text 'Hello from Notewise!' to another app",
-  "Generate a todo list Android app",
+  "Commit a new feature to my GitHub repo",
+  "Read the file src/index.ts from my GitHub repo",
+  "Create a branch called feat/my-feature in my GitHub repo",
   "Generate a weather website",
 ];
 
@@ -81,6 +93,12 @@ export default function AIScreen() {
   const router = useRouter();
   const { items, createItem, updateItem } = useNotesStore();
   const { addApp } = useGeneratedAppsStore();
+  const {
+    token: ghToken,
+    repoOwner: ghOwner,
+    repoName: ghRepo,
+    connected: ghConnected,
+  } = useGitHubStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -95,6 +113,12 @@ export default function AIScreen() {
     type: i.type,
     parentId: i.parentId,
   }));
+
+  const githubContext = {
+    connected: ghConnected,
+    owner: ghOwner,
+    repo: ghRepo,
+  };
 
   const executeActions = async (
     actions: AiAction[],
@@ -163,6 +187,62 @@ export default function AIScreen() {
       } else if (act.action === "open_settings") {
         const result = await openSettings(act.path);
         outcomes.push({ title: act.title ?? "Settings", ...result });
+
+      // ── GitHub actions ────────────────────────────────────────────────
+      } else if (act.action === "github_commit_files" && act.files && act.files.length > 0) {
+        if (!ghConnected || !ghToken || !ghOwner || !ghRepo) {
+          outcomes.push({
+            title: act.title ?? "GitHub commit",
+            success: false,
+            message: "No GitHub repository connected. Go to the GitHub tab to connect one.",
+          });
+        } else {
+          const result = await commitFiles(
+            ghToken,
+            ghOwner,
+            ghRepo,
+            act.files,
+            act.message ?? "AI-generated commit (Notewise AI, no message provided)",
+            act.branch,
+          );
+          outcomes.push({ title: act.title ?? "GitHub commit", ...result });
+        }
+      } else if (act.action === "github_create_branch" && act.branch) {
+        if (!ghConnected || !ghToken || !ghOwner || !ghRepo) {
+          outcomes.push({
+            title: act.title ?? "Create branch",
+            success: false,
+            message: "No GitHub repository connected. Go to the GitHub tab to connect one.",
+          });
+        } else {
+          const result = await createBranch(
+            ghToken,
+            ghOwner,
+            ghRepo,
+            act.branch,
+            act.fromBranch,
+          );
+          outcomes.push({ title: act.title ?? `Branch: ${act.branch}`, ...result });
+        }
+      } else if (act.action === "github_read_file" && act.path) {
+        if (!ghConnected || !ghToken || !ghOwner || !ghRepo) {
+          outcomes.push({
+            title: act.title ?? "Read file",
+            success: false,
+            message: "No GitHub repository connected. Go to the GitHub tab to connect one.",
+          });
+        } else {
+          const result = await readFile(
+            ghToken,
+            ghOwner,
+            ghRepo,
+            act.path,
+            act.branch,
+          );
+          outcomes.push({ title: act.title ?? act.path, ...result });
+          // If file was read successfully, inject its content into the next AI message
+          // by appending to the outcomes detail so the user can see/copy it
+        }
       }
     }
     return { createdItems: created, deviceOutcomes: outcomes };
@@ -193,6 +273,7 @@ export default function AIScreen() {
       const result = await chatMutation.mutateAsync({
         messages: history,
         notesContext,
+        githubContext,
       });
 
       const { createdItems, deviceOutcomes } = await executeActions(result.actions ?? []);
@@ -282,14 +363,19 @@ export default function AIScreen() {
             </View>
           )}
 
-          {/* Device action outcomes */}
+          {/* Device / GitHub action outcomes */}
           {msg.deviceOutcomes && msg.deviceOutcomes.length > 0 && (
             <View style={[styles.createdItems, { borderTopColor: colors.border }]}>
               <Text style={[styles.createdLabel, { color: colors.muted }]}>
-                Device actions:
+                Actions:
               </Text>
               {msg.deviceOutcomes.map((outcome, idx) => (
-                <View key={idx} style={styles.createdItem}>
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.createdItem}
+                  disabled={!outcome.detail}
+                  onPress={() => outcome.detail && openUrl(outcome.detail)}
+                >
                   <IconSymbol
                     name={outcome.success ? "checkmark.circle.fill" : "xmark.circle.fill"}
                     size={12}
@@ -298,7 +384,10 @@ export default function AIScreen() {
                   <Text style={[styles.createdItemText, { color: outcome.success ? "#22c55e" : "#ef4444" }]}>
                     {outcome.title}
                   </Text>
-                </View>
+                  {outcome.detail && (
+                    <IconSymbol name="arrow.up.right" size={10} color="#22c55e" />
+                  )}
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -317,7 +406,7 @@ export default function AIScreen() {
         <View>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notewise AI</Text>
           <Text style={[styles.headerSub, { color: colors.muted }]}>
-            Create notes, control your device
+            Notes, device control & GitHub
           </Text>
         </View>
         {messages.length > 0 && (
@@ -345,7 +434,7 @@ export default function AIScreen() {
               Ask me anything
             </Text>
             <Text style={[styles.emptyDesc, { color: colors.muted }]}>
-              I can create notes, folders, and code files. I can also open apps, search maps, share content, open URLs, call and message — just ask!
+              I can create notes, folders, and code files. I can control your device (open apps, call, SMS, maps, settings). And I can commit code directly to your connected GitHub repo — including changes to this app itself.
             </Text>
             <View style={styles.suggestions}>
               {SUGGESTIONS.map((s, i) => (
