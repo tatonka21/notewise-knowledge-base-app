@@ -1,5 +1,11 @@
 name: Build Android APK
 
+# Triggers:
+#  • Every push to main       → debug APK attached as artifact
+#  • Merged pull request      → debug APK attached as artifact
+#  • Manual (workflow_dispatch) → build on any branch without merging
+#  • GitHub Release published → APK is also attached to the release
+
 on:
   push:
     branches:
@@ -7,11 +13,6 @@ on:
   pull_request:
     types: [closed]
   workflow_dispatch:
-    inputs:
-      profile:
-        description: "EAS build profile (preview or production)"
-        required: false
-        default: "preview"
   release:
     types: [published]
 
@@ -23,13 +24,20 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     permissions:
       contents: write   # needed to attach APK to GitHub Releases
-      actions: read
 
     steps:
+      # ── 1. Source code ─────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      # ── 2. Runtime toolchain ───────────────────────────────────────────
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -39,42 +47,50 @@ jobs:
         with:
           version: 9
 
-      - name: Install dependencies
+      # ── 3. JavaScript dependencies ────────────────────────────────────
+      - name: Install project dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Set up Expo / EAS CLI
-        run: npm install -g eas-cli
+      - name: Install Expo CLI
+        run: npm install -g @expo/cli
 
-      - name: Determine build profile
-        id: profile
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "profile=${{ github.event.inputs.profile }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "release" ]; then
-            echo "profile=production" >> "$GITHUB_OUTPUT"
-          else
-            echo "profile=preview" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build Android APK with EAS
-        run: |
-          eas build \
-            --platform android \
-            --profile ${{ steps.profile.outputs.profile }} \
-            --non-interactive \
-            --output ./notewise.apk
+      # ── 4. Generate native Android project ────────────────────────────
+      #  expo prebuild converts the managed Expo project into a full
+      #  Android Studio project inside ./android/.  No Expo account or
+      #  EXPO_TOKEN required.
+      - name: Generate native Android project (expo prebuild)
+        run: npx expo prebuild --platform android --no-install
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CI: "1"
+          EXPO_NO_TELEMETRY: "1"
 
+      # ── 5. Tune Gradle ────────────────────────────────────────────────
+      - name: Set Gradle JVM memory
+        run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+
+      # ── 6. Build APK ──────────────────────────────────────────────────
+      #  assembleDebug uses the auto-generated debug keystore — no signing
+      #  configuration required.  The resulting APK is fully installable
+      #  on any Android device with "Install unknown apps" enabled.
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      # ── 7. Rename output ──────────────────────────────────────────────
+      - name: Rename APK for download
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk notewise.apk
+
+      # ── 8. Upload artifact ────────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: notewise-android-${{ steps.profile.outputs.profile }}-${{ github.sha }}
-          path: "*.apk"
-          retention-days: 30
+          name: notewise-android-${{ github.sha }}
+          path: notewise.apk
+          retention-days: 90
 
+      # ── 9. Attach to GitHub Release (optional) ────────────────────────
       - name: Attach APK to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: "*.apk"
+          files: notewise.apk
