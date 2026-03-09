@@ -35,6 +35,8 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile
@@ -69,4 +71,22 @@ jobs:
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
+          files: notewise.apk
+
+      - name: Publish rolling "latest" release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest Build"
+          body: |
+            Automatically built from the latest commit on `main`.
+
+            **Install on Android:**
+            1. Download `notewise.apk` from the Assets section below.
+            2. Enable *Settings → Apps → Special app access → Install unknown apps* for your browser.
+            3. Open the downloaded file and tap **Install**.
+            4. Launch **NoteWise** and enter your free [Gemini API key](https://aistudio.google.com/app/apikey) in Settings.
+          prerelease: true
+          make_latest: false
           files: notewise.apk
