@@ -4,14 +4,12 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -52,7 +50,9 @@ interface Message {
   actions?: AiAction[];
   deviceOutcomes?: DeviceActionOutcome[];
   createdItems?: NoteItem[];
-  generatedApp?: { id: string; name: string; type: "app" | "website" };
+  generatedAppId?: string;
+  generatedAppName?: string;
+  generatedAppType?: "app" | "website";
 }
 
 interface AiAction {
@@ -89,9 +89,45 @@ const SUGGESTIONS = [
   "Generate a weather website",
 ];
 
+/**
+ * Detect if the user wants to generate an app or website.
+ * Returns null if it's a general chat message.
+ * When both app and website keywords are present, website takes priority.
+ */
+function detectGenerationIntent(text: string): { type: "app" | "website"; name: string } | null {
+  const lower = text.toLowerCase();
+  const isGenerate = /\b(generate|create|build|make)\b/.test(lower);
+  if (!isGenerate) return null;
+
+  const isWebsite = /\b(website|web site|webpage|web page|html|landing page|site)\b/.test(lower);
+  const isApp = /\b(app|application|android|mobile)\b/.test(lower);
+
+  if (!isWebsite && !isApp) return null;
+
+  // Website takes priority when both keywords are present (e.g., "web app")
+  const type: "app" | "website" = isWebsite ? "website" : "app";
+
+  // Extract a name: try to find "called X", "named X"
+  const calledMatch = text.match(/(?:called|named)\s+["']?([^"'\n,]+?)["']?(?:\s|$)/i);
+  if (calledMatch) {
+    return { type, name: calledMatch[1].trim() };
+  }
+
+  // Fallback: use a cleaned-up version of the message as the name
+  const name = text
+    .replace(/\b(generate|create|build|make|a|an|the|android|mobile|app|application|website|web site|webpage|web page|html|landing page|site)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .slice(0, 4)
+    .join(" ")
+    || (isWebsite ? "My Website" : "My App");
+
+  return { type, name };
+}
+
 export default function AIScreen() {
   const colors = useColors();
-  const router = useRouter();
   const { items, createItem, updateItem } = useNotesStore();
   const { addApp } = useGeneratedAppsStore();
   const {
@@ -265,112 +301,101 @@ export default function AIScreen() {
 
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
-    // Detect app/website generation intent — website check must come first so
-    // phrases like "generate a web app" are routed to website generation.
-    const isWebsiteGenRequest = /(?:generate|create|build|make)\s+(?:a\s+|an\s+)?(?:website|web\s+app|webpage|landing\s+page|web\s+site)\b/i.test(messageText);
-    const isAppGenRequest = !isWebsiteGenRequest && /(?:generate|create|build|make)\s+(?:a\s+|an\s+)?(?:react\s+native\s+|expo\s+|android\s+|mobile\s+)?app\b/i.test(messageText);
+    try {
+      const intent = detectGenerationIntent(messageText);
 
-    if (isAppGenRequest || isWebsiteGenRequest) {
-      try {
-        // Extract a name from the message
-        const nameMatch = messageText.match(/(?:called|named)\s+["']?([^"'\n,]+?)["']?(?:\s+(?:with|that|using|for|which)|[,.]|$)/i);
-        const fallbackName = messageText
-          .replace(/^(?:generate|create|build|make)\s+(?:a|an|the)?\s*/i, "")
-          .replace(/\b(?:react native|expo|android|mobile)\s+app\b/gi, "app")
-          .replace(/\b(?:website|web app|webpage|landing page)\b/gi, "site")
-          .replace(/\s+/g, " ")
-          .trim()
-          .split(" ")
-          .slice(0, 4)
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ") || (isAppGenRequest ? "My App" : "My Website");
-        const name = nameMatch ? nameMatch[1].trim() : fallbackName;
-
-        if (isWebsiteGenRequest) {
+      if (intent) {
+        // Route to dedicated generation endpoints
+        if (intent.type === "website") {
           const result = await generateWebsiteMutation.mutateAsync({
             description: messageText,
-            siteName: name,
+            siteName: intent.name,
           });
+
           if (result.success && result.website) {
             const newApp = addApp({
               type: "website",
-              name,
-              description: messageText,
-              code: result.website.html ?? "",
+              name: result.website.siteName ?? intent.name,
+              description: result.website.description ?? messageText,
+              code: result.website.html ?? JSON.stringify(result.website, null, 2),
               preview: result.website.html,
             });
             const assistantMsg: Message = {
               id: (Date.now() + 1).toString(),
               role: "assistant",
-              content: `I've generated the website "${name}"! Tap below to preview it.`,
-              generatedApp: { id: newApp.id, name, type: "website" },
+              content: `I've generated the **${newApp.name}** website! Tap the preview below to view it.`,
+              generatedAppId: newApp.id,
+              generatedAppName: newApp.name,
+              generatedAppType: "website",
             };
             setMessages((prev) => [...prev, assistantMsg]);
           } else {
-            throw new Error(result.error ?? "Website generation failed");
+            const errMsg: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: `Sorry, I couldn't generate the website. ${(result as { error?: string }).error ?? "Please try again."}`,
+            };
+            setMessages((prev) => [...prev, errMsg]);
           }
         } else {
           const result = await generateAppMutation.mutateAsync({
             description: messageText,
-            appName: name,
+            appName: intent.name,
           });
+
           if (result.success && result.app) {
+            const code = (result.app as { mainFile?: string }).mainFile ?? JSON.stringify(result.app, null, 2);
             const newApp = addApp({
               type: "app",
-              name,
-              description: messageText,
-              code: result.app.mainFile ?? "",
+              name: (result.app as { appName?: string }).appName ?? intent.name,
+              description: (result.app as { description?: string }).description ?? messageText,
+              code,
             });
             const assistantMsg: Message = {
               id: (Date.now() + 1).toString(),
               role: "assistant",
-              content: `I've generated the React Native app "${name}"! Tap below to view the code and build options.`,
-              generatedApp: { id: newApp.id, name, type: "app" },
+              content: `I've generated the **${newApp.name}** app! Tap the preview below to view and build it.`,
+              generatedAppId: newApp.id,
+              generatedAppName: newApp.name,
+              generatedAppType: "app",
             };
             setMessages((prev) => [...prev, assistantMsg]);
           } else {
-            throw new Error(result.error ?? "App generation failed");
+            const errMsg: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: `Sorry, I couldn't generate the app. ${(result as { error?: string }).error ?? "Please try again."}`,
+            };
+            setMessages((prev) => [...prev, errMsg]);
           }
         }
+      } else {
+        // General chat
+        const history = [...messages, userMsg].map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        }));
 
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-      } catch (err) {
-        const errMsg: Message = {
+        const result = await chatMutation.mutateAsync({
+          messages: history,
+          notesContext,
+          githubContext,
+        });
+
+        const { createdItems, deviceOutcomes } = await executeActions(result.actions ?? []);
+
+        const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: "Sorry, I encountered an error generating that. Please try again.",
+          content: result.text,
+          actions: result.actions,
+          createdItems,
+          deviceOutcomes,
         };
-        setMessages((prev) => [...prev, errMsg]);
-      } finally {
-        setIsLoading(false);
+
+        setMessages((prev) => [...prev, assistantMsg]);
       }
-      return;
-    }
 
-    try {
-      const history = [...messages, userMsg].map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      }));
-
-      const result = await chatMutation.mutateAsync({
-        messages: history,
-        notesContext,
-        githubContext,
-      });
-
-      const { createdItems, deviceOutcomes } = await executeActions(result.actions ?? []);
-
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: result.text,
-        actions: result.actions,
-        createdItems,
-        deviceOutcomes,
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (err) {
       const errMsg: Message = {
@@ -403,19 +428,19 @@ export default function AIScreen() {
             {msg.content}
           </Text>
 
-          {/* Generated app/website link */}
-          {msg.generatedApp && (
+          {/* Generated app preview link */}
+          {msg.generatedAppId && (
             <TouchableOpacity
-              style={[styles.generatedAppLink, { backgroundColor: colors.primary + "22", borderColor: colors.primary + "44" }]}
-              onPress={() => navToPreview(msg.generatedApp!.id)}
+              style={[styles.previewLink, { backgroundColor: colors.primary + "18", borderColor: colors.primary }]}
+              onPress={() => navToPreview(msg.generatedAppId!)}
             >
               <IconSymbol
-                name={msg.generatedApp.type === "website" ? "globe" : "iphone"}
-                size={16}
+                name={msg.generatedAppType === "website" ? "globe" : "hammer.fill"}
+                size={14}
                 color={colors.primary}
               />
-              <Text style={[styles.generatedAppText, { color: colors.primary }]}>
-                {msg.generatedApp.type === "website" ? "Preview Website" : "View App"}: {msg.generatedApp.name}
+              <Text style={[styles.previewLinkText, { color: colors.primary }]}>
+                {msg.generatedAppType === "website" ? "View Website" : "View App"}: {msg.generatedAppName}
               </Text>
               <IconSymbol name="arrow.up.right" size={12} color={colors.primary} />
             </TouchableOpacity>
@@ -731,21 +756,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     flex: 1,
   },
-  generatedAppLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  generatedAppText: {
-    fontSize: 13,
-    fontWeight: "600",
-    flex: 1,
-  },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -792,5 +802,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+  previewLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  previewLinkText: {
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
   },
 });

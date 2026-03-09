@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, generatedApps, InsertGeneratedApp, GeneratedAppRecord } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -90,3 +90,65 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // TODO: add feature queries here as your schema grows.
+
+export async function saveGeneratedApp(app: InsertGeneratedApp): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot save generated app: database not available");
+    return;
+  }
+
+  try {
+    await db
+      .insert(generatedApps)
+      .values(app)
+      .onDuplicateKeyUpdate({
+        set: {
+          name: app.name,
+          description: app.description,
+          code: app.code,
+          preview: app.preview ?? null,
+          buildStatus: app.buildStatus ?? "idle",
+          buildError: app.buildError ?? null,
+          apkUrl: app.apkUrl ?? null,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (error) {
+    console.error("[Database] Failed to save generated app:", error);
+    throw error;
+  }
+}
+
+export async function getGeneratedApp(id: string): Promise<GeneratedAppRecord | undefined> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get generated app: database not available");
+    return undefined;
+  }
+
+  const result = await db
+    .select()
+    .from(generatedApps)
+    .where(eq(generatedApps.id, id))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function listGeneratedApps(opts?: { limit?: number; offset?: number }): Promise<GeneratedAppRecord[]> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot list generated apps: database not available");
+    return [];
+  }
+
+  const query = db.select().from(generatedApps).orderBy(generatedApps.createdAt).$dynamic();
+  if (opts?.limit !== undefined) {
+    query.limit(opts.limit);
+  }
+  if (opts?.offset !== undefined) {
+    query.offset(opts.offset);
+  }
+  return await query;
+}
