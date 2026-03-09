@@ -6,6 +6,8 @@ export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
+  /** Gemini API key forwarded from the mobile client via `X-Gemini-API-Key` header. */
+  userApiKey: string | null;
 };
 
 export async function createContext(opts: CreateExpressContextOptions): Promise<TrpcContext> {
@@ -18,9 +20,12 @@ export async function createContext(opts: CreateExpressContextOptions): Promise<
     user = null;
   }
 
+  const userApiKey = (opts.req.headers["x-gemini-api-key"] as string) || null;
+
   return {
     req: opts.req,
     res: opts.res,
     user,
+    userApiKey,
   };
 }

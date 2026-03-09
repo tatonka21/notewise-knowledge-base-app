@@ -201,14 +201,23 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
+const resolveApiUrl = (userApiKey?: string | null) => {
+  // When the user provides their own Gemini API key, call Google's
+  // OpenAI-compatible endpoint directly — no Forge proxy needed.
+  if (userApiKey) {
+    return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+  }
+  return ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
     ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
     : "https://forge.manus.im/v1/chat/completions";
+};
 
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+const assertApiKey = (userApiKey?: string | null) => {
+  if (!userApiKey && !ENV.forgeApiKey) {
+    throw new Error(
+      "No API key configured. Set BUILT_IN_FORGE_API_KEY on the server, " +
+        "or enter a Gemini API key in the app's Settings screen.",
+    );
   }
 };
 
@@ -252,8 +261,11 @@ const normalizeResponseFormat = ({
   };
 };
 
-export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+export async function invokeLLM(params: InvokeParams, userApiKey?: string | null): Promise<InvokeResult> {
+  assertApiKey(userApiKey);
+
+  // Prefer user-supplied key; fall back to server-side forge key.
+  const apiKey = userApiKey || ENV.forgeApiKey;
 
   const {
     messages,
@@ -296,11 +308,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
+  const response = await fetch(resolveApiUrl(userApiKey), {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
   });

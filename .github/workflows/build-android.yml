@@ -1,0 +1,72 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ❌ Removed: npm install -g @expo/cli
+      # Expo CLI will be run via pnpm exec instead
+
+      - name: Generate native Android project (expo prebuild)
+        run: pnpm exec expo prebuild --platform android --no-install
+        env:
+          CI: "1"
+          EXPO_NO_TELEMETRY: "1"
+
+      - name: Set Gradle JVM memory
+        run: printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m\n' >> android/gradle.properties
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK for download
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk notewise.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notewise-android-${{ github.sha }}
+          path: notewise.apk
+          retention-days: 90
+
+      - name: Attach APK to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: notewise.apk

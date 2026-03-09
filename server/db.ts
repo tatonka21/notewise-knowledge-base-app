@@ -143,12 +143,12 @@ export async function listGeneratedApps(opts?: { limit?: number; offset?: number
     return [];
   }
 
-  const query = db.select().from(generatedApps).orderBy(generatedApps.createdAt);
+  const query = db.select().from(generatedApps).orderBy(generatedApps.createdAt).$dynamic();
   if (opts?.limit !== undefined) {
     query.limit(opts.limit);
   }
   if (opts?.offset !== undefined) {
     query.offset(opts.offset);
   }
-  return query;
+  return await query;
 }
