@@ -26,11 +26,11 @@ jobs:
       contents: write   # needed to attach APK to GitHub Releases
 
     steps:
-      # ── 1. Source code ─────────────────────────────────────────────────
+      # ── 1. Source code ─────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Runtime toolchain ───────────────────────────────────────────
+      # ── 2. Runtime toolchain ───────────────────────────────────────────────
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -45,16 +45,16 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.12.0
 
-      # ── 3. JavaScript dependencies ────────────────────────────────────
+      # ── 3. JavaScript dependencies ─────────────────────────────────────────
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Install Expo CLI
         run: npm install -g @expo/cli
 
-      # ── 4. Generate native Android project ────────────────────────────
+      # ── 4. Generate native Android project ─────────────────────────────────
       #  expo prebuild converts the managed Expo project into a full
       #  Android Studio project inside ./android/.  No Expo account or
       #  EXPO_TOKEN required.
@@ -64,11 +64,11 @@ jobs:
           CI: "1"
           EXPO_NO_TELEMETRY: "1"
 
-      # ── 5. Tune Gradle ────────────────────────────────────────────────
+      # ── 5. Tune Gradle ─────────────────────────────────────────────────────
       - name: Set Gradle JVM memory
         run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
 
-      # ── 6. Build APK ──────────────────────────────────────────────────
+      # ── 6. Build APK ───────────────────────────────────────────────────────
       #  assembleDebug uses the auto-generated debug keystore — no signing
       #  configuration required.  The resulting APK is fully installable
       #  on any Android device with "Install unknown apps" enabled.
@@ -76,11 +76,11 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      # ── 7. Rename output ──────────────────────────────────────────────
+      # ── 7. Rename output ───────────────────────────────────────────────────
       - name: Rename APK for download
         run: cp android/app/build/outputs/apk/debug/app-debug.apk notewise.apk
 
-      # ── 8. Upload artifact ────────────────────────────────────────────
+      # ── 8. Upload artifact ─────────────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -88,7 +88,7 @@ jobs:
           path: notewise.apk
           retention-days: 90
 
-      # ── 9. Attach to GitHub Release (optional) ────────────────────────
+      # ── 9. Attach to GitHub Release (optional) ─────────────────────────────
       - name: Attach APK to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
