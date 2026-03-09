@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { invokeLLM } from "./_core/llm";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { saveGeneratedApp, listGeneratedApps } from "./db";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -155,7 +156,16 @@ Make sure:
         
         try {
           const appData = JSON.parse(content);
-          return { success: true, app: appData };
+          const id = crypto.randomUUID();
+          const code = appData.mainFile ?? JSON.stringify(appData, null, 2);
+          await saveGeneratedApp({
+            id,
+            type: "app",
+            name: appData.appName ?? appName,
+            description: appData.description ?? description,
+            code,
+          });
+          return { success: true, app: { ...appData, id } };
         } catch (e) {
           console.error("Failed to parse app generation response:", e);
           return { success: false, error: "Failed to generate app" };
@@ -210,12 +220,26 @@ Make sure:
         
         try {
           const websiteData = JSON.parse(content);
-          return { success: true, website: websiteData };
+          const id = crypto.randomUUID();
+          const code = websiteData.html ?? JSON.stringify(websiteData, null, 2);
+          await saveGeneratedApp({
+            id,
+            type: "website",
+            name: websiteData.siteName ?? siteName,
+            description: websiteData.description ?? description,
+            code,
+            preview: websiteData.html,
+          });
+          return { success: true, website: { ...websiteData, id } };
         } catch (e) {
           console.error("Failed to parse website generation response:", e);
           return { success: false, error: "Failed to generate website" };
         }
       }),
+
+    listApps: publicProcedure.query(async () => {
+      return listGeneratedApps();
+    }),
   }),
 });
 
