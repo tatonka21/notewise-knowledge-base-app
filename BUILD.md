@@ -69,7 +69,47 @@ chmod +x build-apk.sh
 
 ---
 
-## Option 3 — EAS Cloud (needs Expo account)
+## Option 3 — Expo Web Preview (browser-based, zero setup)
+
+The **"Expo Web Preview"** workflow builds a static web version of the app that
+runs directly in any desktop or mobile browser — no APK, no Expo Go, no phone
+required.
+
+### Automatic deployments to GitHub Pages
+
+Every push to `main` triggers the workflow and redeploys the live preview at:
+
+> `https://<your-github-username>.github.io/<repo-name>/`
+
+> **One-time setup:** Enable GitHub Pages for this repository first.
+> 1. Go to **Settings → Pages** in the repository.
+> 2. Under **Source**, select **GitHub Actions**.
+> 3. Save. The next workflow run will publish the site automatically.
+
+### Download a one-off preview build (no Pages setup needed)
+
+You can also grab a standalone build artifact from any branch — including pull
+requests — without configuring GitHub Pages:
+
+1. Go to **Actions → Expo Web Preview**.
+2. Click **"Run workflow"**, pick a branch, then click the green
+   **"Run workflow"** button.
+3. Wait for the job to finish (green ✅, ~3–5 minutes).
+4. Click the completed run, scroll to **Artifacts**, and download
+   **`expo-web-preview-<sha>`**.
+5. Unzip the file, then serve it locally:
+   ```bash
+   cd expo-web-preview-<sha>
+   npx serve .
+   # Open http://localhost:3000 in your browser
+   ```
+
+Pull-request builds also upload the artifact automatically — look for it in the
+**Artifacts** section of the PR's workflow run.
+
+---
+
+## Option 4 — EAS Cloud (needs Expo account)
 
 If you have an Expo account and have set the `EXPO_TOKEN` GitHub secret, you can
 trigger EAS cloud builds manually:
