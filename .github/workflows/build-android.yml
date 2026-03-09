@@ -44,8 +44,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
 
       # ── 3. JavaScript dependencies ─────────────────────────────────────────
       - name: Install project dependencies
