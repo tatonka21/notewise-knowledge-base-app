@@ -35,8 +35,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile
@@ -51,7 +49,7 @@ jobs:
           EXPO_NO_TELEMETRY: "1"
 
       - name: Set Gradle JVM memory
-        run: echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+        run: printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m\n' >> android/gradle.properties
 
       - name: Build debug APK
         working-directory: android
