@@ -1,6 +1,7 @@
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -22,6 +23,12 @@ import { useNotesStore } from "@/store/notes-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { useGitHubStore } from "@/store/github-store";
 import { useGeneratedAppsStore } from "@/store/generated-apps-store";
+import { ErrorBoundary } from "@/components/error-boundary";
+
+// Keep the splash screen visible while loading stores.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Already hidden or not supported – safe to ignore.
+});
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -42,7 +49,7 @@ export default function RootLayout() {
     initManusRuntime();
   }, []);
 
-  // Initialize stores on app startup
+  // Initialize stores on app startup, then hide splash screen
   useEffect(() => {
     const initStores = async () => {
       try {
@@ -52,6 +59,10 @@ export default function RootLayout() {
         await useGeneratedAppsStore.getState().load();
       } catch (e) {
         console.error("Failed to initialize stores:", e);
+      } finally {
+        // Always hide the splash screen once initialization is complete,
+        // even if some stores fail to load.
+        await SplashScreen.hideAsync().catch(() => {});
       }
     };
     initStores();
@@ -126,21 +137,25 @@ export default function RootLayout() {
 
   if (shouldOverrideSafeArea) {
     return (
-      <ThemeProvider>
-        <SafeAreaProvider initialMetrics={providerInitialMetrics}>
-          <SafeAreaFrameContext.Provider value={frame}>
-            <SafeAreaInsetsContext.Provider value={insets}>
-              {content}
-            </SafeAreaInsetsContext.Provider>
-          </SafeAreaFrameContext.Provider>
-        </SafeAreaProvider>
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <SafeAreaProvider initialMetrics={providerInitialMetrics}>
+            <SafeAreaFrameContext.Provider value={frame}>
+              <SafeAreaInsetsContext.Provider value={insets}>
+                {content}
+              </SafeAreaInsetsContext.Provider>
+            </SafeAreaFrameContext.Provider>
+          </SafeAreaProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
     );
   }
 
   return (
-    <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

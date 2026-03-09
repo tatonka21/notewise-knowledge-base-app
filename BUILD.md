@@ -93,15 +93,67 @@ eas build --platform android --profile preview
 
 ---
 
+## Option 4 — Expo Live Preview (hot-reload on your phone, fastest for development)
+
+This is the best workflow for iterating quickly: every time you save a file, the
+app on your phone updates **instantly** — no re-build or re-install needed.
+
+### One-time setup (build the Dev Client APK once)
+
+The Dev Client APK is a special debug build that understands how to talk to the
+Metro bundler running on your computer. You install it once and then use it forever
+(until you change native dependencies).
+
+1. Go to **Actions** (click the "Actions" tab at the top of the GitHub page).  
+2. Click **"Build Expo Dev Client APK"** in the left sidebar.
+3. Click **"Run workflow"** → pick a branch → click the green **"Run workflow"** button.
+4. Wait ~15–25 minutes for the ✅.
+5. Download the artifact **`notewise-dev-client-<sha>`**, unzip → `notewise-dev-client.apk`.
+6. Install `notewise-dev-client.apk` on your Android phone (enable unknown sources first — see below).
+
+### Daily workflow (zero wait time after the first install)
+
+**On your computer** (where you edit the code):
+```bash
+# Install dependencies if you haven't already
+pnpm install
+
+# Start the Metro bundler (shows a QR code in the terminal)
+pnpm expo:start
+```
+
+If your computer and phone are on the **same Wi-Fi network**, scan the QR code with
+the Notewise Dev Client app and the app will open with live reload.
+
+If they are on **different networks** (e.g. phone on mobile data), use tunnel mode:
+```bash
+pnpm expo:tunnel
+```
+This routes traffic through a public URL so you can scan from anywhere.
+
+### What changes don't require a rebuild?
+
+| Change type | Requires reinstall? |
+|-------------|---------------------|
+| JavaScript / TypeScript changes | ❌ No — hot-reload |
+| Adding/removing a new screen | ❌ No — hot-reload |
+| Changing `package.json` JS dependencies | ❌ No — just restart Metro |
+| Adding/removing a **native** package (`pnpm add react-native-xyz`) | ✅ Yes — rebuild APK |
+| Changing `app.config.ts` permissions or plugins | ✅ Yes — rebuild APK |
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
 | Workflow fails at "Generate native Android project" | Open an issue — check the build log for the exact error |
 | Workflow fails at "Build debug APK" | Usually a Gradle memory issue; the workflow already sets `Xmx4g` |
-| APK installs but app crashes | Enter your Gemini API key in **Settings → API Configuration** |
+| APK installs but app crashes | Check the error boundary screen for details; also confirm a Gemini API key is set in **Settings** |
 | "App not installed" error | Uninstall any previous version first, then re-install |
 | GitHub says "No artifacts" | The workflow is still running, or it failed — check the Actions log |
+| QR code scan doesn't connect | Make sure phone and computer are on the same Wi-Fi, or use `pnpm expo:tunnel` |
+| App shows "Something went wrong" screen | The error boundary caught a crash — note the error text and open an issue |
 
 ---
 

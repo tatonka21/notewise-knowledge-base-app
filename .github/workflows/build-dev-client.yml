@@ -1,0 +1,71 @@
+name: Build Expo Dev Client APK
+
+# Builds a "development client" APK — this is a special debug build that includes
+# the Expo dev server protocol so you can:
+#   1. Install the APK once on your Android phone.
+#   2. Run `pnpm expo:start` (or `pnpm expo:tunnel`) on your computer.
+#   3. Scan the QR code shown in the terminal — the app hot-reloads on every save.
+#
+# You only need to re-build/reinstall this APK when you change native dependencies.
+# JavaScript/TypeScript changes preview instantly via the dev server.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build from"
+        required: false
+        default: "main"
+
+jobs:
+  build-dev-client:
+    name: Build Expo Dev Client APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate native Android project with dev client
+        run: pnpm exec expo prebuild --platform android --no-install
+        env:
+          CI: "1"
+          EXPO_NO_TELEMETRY: "1"
+
+      - name: Set Gradle JVM memory
+        run: printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m\n' >> android/gradle.properties
+
+      - name: Build debug APK (includes Expo dev client)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk notewise-dev-client.apk
+
+      - name: Upload dev client APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notewise-dev-client-${{ github.sha }}
+          path: notewise-dev-client.apk
+          retention-days: 30
