@@ -1,0 +1,84 @@
+name: Expo Web Preview
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent Pages deployment; cancel in-progress runs on new
+# pushes to the same branch so only the latest deployment is live.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Export Expo web build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Export Expo web build
+        run: pnpm exec expo export --platform web
+        env:
+          CI: "1"
+          EXPO_NO_TELEMETRY: "1"
+          # Optional: set the public API base URL for the deployed web preview.
+          # Add EXPO_PUBLIC_API_BASE_URL as a repository secret to enable it.
+          EXPO_PUBLIC_API_BASE_URL: ${{ secrets.EXPO_PUBLIC_API_BASE_URL }}
+
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-web-preview-${{ github.sha }}
+          path: dist/
+          retention-days: 30
+
+      - name: Configure GitHub Pages
+        # Only deploy on pushes to main or manual runs, not on pull request builds,
+        # so that PRs generate a downloadable artifact but don't overwrite the live
+        # Pages site until the code is merged.
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
