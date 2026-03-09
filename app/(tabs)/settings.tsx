@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -49,13 +51,25 @@ export default function SettingsScreen() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const { setColorScheme } = useThemeContext();
-  const { fontSize, editorTheme, load, setFontSize, setEditorTheme } = useSettingsStore();
+  const { fontSize, editorTheme, geminiApiKey, apiBaseUrl, load, setFontSize, setEditorTheme, setGeminiApiKey, setApiBaseUrl } = useSettingsStore();
   const { items } = useNotesStore();
   const { connected, repoOwner, repoName } = useGitHubStore();
+
+  const [apiKeyInput, setApiKeyInput] = useState(geminiApiKey);
+  const [apiUrlInput, setApiUrlInput] = useState(apiBaseUrl);
 
   useEffect(() => {
     load();
   }, []);
+
+  // Sync local inputs when store values load from AsyncStorage
+  useEffect(() => {
+    setApiKeyInput(geminiApiKey);
+  }, [geminiApiKey]);
+
+  useEffect(() => {
+    setApiUrlInput(apiBaseUrl);
+  }, [apiBaseUrl]);
 
   const isDark = colorScheme === "dark";
   const noteCount = items.filter((i) => i.type !== "folder").length;
@@ -167,6 +181,61 @@ export default function SettingsScreen() {
               </View>
             }
           />
+        </View>
+
+        {/* API Configuration */}
+        <Text style={[styles.sectionLabel, { color: colors.muted }]}>API CONFIGURATION</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
+            <View style={[styles.settingIcon, { backgroundColor: colors.primary + "22" }]}>
+              <IconSymbol name="key.fill" size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingTitle, { color: colors.foreground }]}>Gemini API Key</Text>
+              <TextInput
+                style={[styles.apiInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+                value={apiKeyInput}
+                onChangeText={setApiKeyInput}
+                onBlur={() => {
+                  const trimmed = apiKeyInput.trim();
+                  setGeminiApiKey(trimmed);
+                  if (trimmed) {
+                    Alert.alert("Saved", "Gemini API key saved.");
+                  }
+                }}
+                placeholder="AIza..."
+                placeholderTextColor={colors.muted}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+          <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
+            <View style={[styles.settingIcon, { backgroundColor: colors.primary + "22" }]}>
+              <IconSymbol name="network" size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingTitle, { color: colors.foreground }]}>API Server URL</Text>
+              <TextInput
+                style={[styles.apiInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }]}
+                value={apiUrlInput}
+                onChangeText={setApiUrlInput}
+                onBlur={() => {
+                  const trimmed = apiUrlInput.trim();
+                  setApiBaseUrl(trimmed);
+                  if (trimmed) {
+                    Alert.alert("Saved", "API server URL saved.");
+                  }
+                }}
+                placeholder="https://your-server.example.com"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+            </View>
+          </View>
         </View>
 
         {/* About */}
@@ -304,5 +373,13 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 11,
     fontWeight: "700",
+  },
+  apiInput: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 13,
   },
 });

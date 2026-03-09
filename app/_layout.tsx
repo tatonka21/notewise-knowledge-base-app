@@ -82,7 +82,12 @@ export default function RootLayout() {
         },
       }),
   );
-  const [trpcClient] = useState(() => createTRPCClient());
+
+  // Watch the user's saved API server URL.  When it changes (e.g. after
+  // AsyncStorage finishes loading, or after the user edits Settings) we
+  // recreate the tRPC client so the new URL is used for all future calls.
+  const { apiBaseUrl } = useSettingsStore();
+  const trpcClient = useMemo(() => createTRPCClient(), [apiBaseUrl]);
 
   // Ensure minimum 8px padding for top and bottom on mobile
   const providerInitialMetrics = useMemo(() => {
