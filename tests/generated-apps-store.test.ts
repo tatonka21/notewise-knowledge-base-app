@@ -1,9 +1,34 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mockAsyncStorage = vi.hoisted(() => {
+  const store = new Map<string, string>();
+  return {
+    store,
+    async getItem(key: string) {
+      return store.get(key) ?? null;
+    },
+    async setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+    async removeItem(key: string) {
+      store.delete(key);
+    },
+    async clear() {
+      store.clear();
+    },
+  };
+});
+
+vi.mock("@react-native-async-storage/async-storage", () => ({
+  default: mockAsyncStorage,
+}));
+
 import { useGeneratedAppsStore, type GeneratedApp } from "../store/generated-apps-store";
 
 describe("useGeneratedAppsStore", () => {
   beforeEach(() => {
     // Reset store before each test
+    mockAsyncStorage.store.clear();
     useGeneratedAppsStore.setState({ apps: [], loaded: false });
   });
 
