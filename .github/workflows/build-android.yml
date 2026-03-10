@@ -59,9 +59,10 @@ jobs:
         run: cp android/app/build/outputs/apk/debug/app-debug.apk notewise.apk
 
       - name: Upload APK artifact
+        id: upload-apk
         uses: actions/upload-artifact@v4
         with:
-          name: notewise-android-${{ github.sha }}
+          name: notewise-apk
           path: notewise.apk
           retention-days: 90
 
@@ -70,3 +71,25 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: notewise.apk
+
+      - name: Write job summary with download instructions
+        run: |
+          echo "## ✅ Android APK Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Your APK has been built and uploaded as a workflow artifact." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 How to download your APK" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Click the **Summary** tab at the top of this workflow run page (you may already be there)." >> $GITHUB_STEP_SUMMARY
+          echo "2. Scroll to the **Artifacts** section at the bottom of the page." >> $GITHUB_STEP_SUMMARY
+          echo "3. Click **notewise-apk** to download the ZIP file." >> $GITHUB_STEP_SUMMARY
+          echo "4. Unzip the downloaded file — it contains **notewise.apk**." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Or use this direct link to the workflow run:" >> $GITHUB_STEP_SUMMARY
+          echo "[🔗 Go to this workflow run's artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📱 How to install on your Android device" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Enable **Install Unknown Apps** (or *Install from Unknown Sources*) in Android Settings." >> $GITHUB_STEP_SUMMARY
+          echo "2. Transfer **notewise.apk** to your phone (USB cable, Google Drive, email, etc.)." >> $GITHUB_STEP_SUMMARY
+          echo "3. Open the file on your phone and tap **Install**." >> $GITHUB_STEP_SUMMARY
