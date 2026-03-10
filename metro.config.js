@@ -2,7 +2,7 @@ const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
 
 const config = getDefaultConfig(__dirname);
-const isCI = process.env.CI === "true" || process.env.CI === "1";
+const isCI = !!process.env.CI && process.env.CI !== "false";
 
 module.exports = withNativeWind(config, {
   input: "./global.css",
