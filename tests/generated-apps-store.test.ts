@@ -1,10 +1,34 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// Mock AsyncStorage before importing the store to avoid window access in Node test env
+const { mockStorage } = vi.hoisted(() => ({
+  mockStorage: new Map<string, string>(),
+}));
+
+vi.mock("@react-native-async-storage/async-storage", () => ({
+  default: {
+    getItem: async (key: string) =>
+      mockStorage.has(key) ? mockStorage.get(key)! : null,
+    setItem: async (key: string, value: string) => {
+      mockStorage.set(key, value);
+    },
+    removeItem: async (key: string) => {
+      mockStorage.delete(key);
+    },
+    clear: async () => {
+      mockStorage.clear();
+    },
+  },
+}));
+
+// Import AFTER mocks are set up
 import { useGeneratedAppsStore, type GeneratedApp } from "../store/generated-apps-store";
 
 describe("useGeneratedAppsStore", () => {
   beforeEach(() => {
     // Reset store before each test
     useGeneratedAppsStore.setState({ apps: [], loaded: false });
+    mockStorage.clear();
   });
 
   it("initializes with empty apps", () => {
