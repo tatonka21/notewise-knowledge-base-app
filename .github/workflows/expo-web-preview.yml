@@ -2,8 +2,6 @@ name: Expo Web Preview
 
 on:
   push:
-    branches:
-      - "**"
     branches-ignore:
       - "copilot/**"
   workflow_dispatch:
