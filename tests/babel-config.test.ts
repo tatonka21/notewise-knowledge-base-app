@@ -13,6 +13,7 @@ describe("babel.config", () => {
     const plugins = config.plugins ?? [];
 
     expect(plugins).toContain("react-native-reanimated/plugin");
+    // Reanimated requires its Babel plugin to be the final entry
     expect(plugins[plugins.length - 1]).toBe("react-native-reanimated/plugin");
   });
 });
