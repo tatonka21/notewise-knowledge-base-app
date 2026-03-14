@@ -166,14 +166,14 @@ describe("useGeneratedAppsStore", () => {
     });
 
     // allow async save to resolve
-    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
     const storedAfterAdd = mockStorage.get("notewise_generated_apps");
     expect(storedAfterAdd).toBeTruthy();
     const parsedAfterAdd = JSON.parse(storedAfterAdd!);
     expect(parsedAfterAdd.some((a: GeneratedApp) => a.id === added.id)).toBe(true);
 
     store.deleteApp(added.id);
-    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
     const storedAfterDelete = mockStorage.get("notewise_generated_apps");
     expect(storedAfterDelete).toBeTruthy();
     const parsedAfterDelete = JSON.parse(storedAfterDelete!);
