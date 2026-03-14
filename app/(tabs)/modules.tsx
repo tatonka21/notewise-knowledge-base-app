@@ -6,13 +6,33 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { getModulesByCategory, layoutSchemes, moduleCategories, type ModuleDefinition } from "@/constants/module-catalog";
 import { useColors } from "@/hooks/use-colors";
 
-function iconForModule(module: ModuleDefinition): "doc.text.fill" | "folder.fill" | "sparkles" | "gearshape.fill" | "chevron.left.forwardslash.chevron.right" | "rectangle.split.3x1" | "tag.fill" {
+type ModuleIconName =
+  | "doc.text.fill"
+  | "folder.fill"
+  | "sparkles"
+  | "gearshape.fill"
+  | "chevron.left.forwardslash.chevron.right"
+  | "rectangle.split.3x1";
+
+function iconForModule(module: ModuleDefinition): ModuleIconName {
   if (module.id <= 5) return "folder.fill";
   if (module.id <= 10) return "chevron.left.forwardslash.chevron.right";
   if (module.id <= 15) return "doc.text.fill";
   if (module.id <= 20) return "rectangle.split.3x1";
   if (module.id <= 25) return "sparkles";
   return "gearshape.fill";
+}
+
+function withAlpha(color: string, alpha: number): string {
+  if (!color.startsWith("#")) return color;
+  const normalized = color.length === 4
+    ? `#${color.slice(1).split("").map((channel) => `${channel}${channel}`).join("")}`
+    : color;
+  const alphaChannel = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+  return `${normalized}${alphaChannel}`;
 }
 
 export default function ModulesScreen() {
@@ -64,9 +84,9 @@ export default function ModulesScreen() {
                 <Text style={[styles.categoryTitle, { color: colors.foreground }]}>{category.title}</Text>
                 <Text style={[styles.categoryDescription, { color: colors.muted }]}>{category.description}</Text>
                 {modules.map((module) => (
-                  <View key={module.id} style={[styles.moduleCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                    <View key={module.id} style={[styles.moduleCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
                     <View style={styles.moduleHeader}>
-                      <View style={[styles.moduleIcon, { backgroundColor: colors.primary + "22" }]}>
+                      <View style={[styles.moduleIcon, { backgroundColor: withAlpha(colors.primary, 0.13) }]}>
                         <IconSymbol name={iconForModule(module)} size={14} color={colors.primary} />
                       </View>
                       <Text style={[styles.moduleTitle, { color: colors.foreground }]}>
