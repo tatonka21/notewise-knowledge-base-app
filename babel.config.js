@@ -3,6 +3,7 @@ module.exports = function (api) {
   let plugins = [];
 
   plugins.push("react-native-worklets/plugin");
+  // Must remain the final plugin per Reanimated docs
   plugins.push("react-native-reanimated/plugin");
 
   return {
