@@ -155,4 +155,28 @@ describe("useGeneratedAppsStore", () => {
     expect(app.createdAt).toBeLessThanOrEqual(after);
     expect(app.updatedAt).toBe(app.createdAt);
   });
+
+  it("persists changes to AsyncStorage after mutations", async () => {
+    const store = useGeneratedAppsStore.getState();
+    const added = store.addApp({
+      type: "app",
+      name: "Persisted App",
+      description: "Saved to storage",
+      code: "console.log('persist');",
+    });
+
+    // allow async save to resolve
+    await Promise.resolve();
+    const storedAfterAdd = mockStorage.get("notewise_generated_apps");
+    expect(storedAfterAdd).toBeTruthy();
+    const parsedAfterAdd = JSON.parse(storedAfterAdd!);
+    expect(parsedAfterAdd.some((a: GeneratedApp) => a.id === added.id)).toBe(true);
+
+    store.deleteApp(added.id);
+    await Promise.resolve();
+    const storedAfterDelete = mockStorage.get("notewise_generated_apps");
+    expect(storedAfterDelete).toBeTruthy();
+    const parsedAfterDelete = JSON.parse(storedAfterDelete!);
+    expect(parsedAfterDelete.every((a: GeneratedApp) => a.id !== added.id)).toBe(true);
+  });
 });
