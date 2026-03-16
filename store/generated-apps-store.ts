@@ -64,30 +64,27 @@ export const useGeneratedAppsStore = create<GeneratedAppsState>((set, get) => ({
       updatedAt: Date.now(),
       buildStatus: "idle",
     };
-    set((state) => {
-      const apps = [...state.apps, newApp];
-      state.save();
-      return { apps };
-    });
+    set((state) => ({
+      apps: [...state.apps, newApp],
+    }));
+    get().save();
     return newApp;
   },
 
   deleteApp: (id) => {
-    set((state) => {
-      const apps = state.apps.filter((a) => a.id !== id);
-      state.save();
-      return { apps };
-    });
+    set((state) => ({
+      apps: state.apps.filter((a) => a.id !== id),
+    }));
+    get().save();
   },
 
   updateApp: (id, updates) => {
-    set((state) => {
-      const apps = state.apps.map((a) =>
+    set((state) => ({
+      apps: state.apps.map((a) =>
         a.id === id ? { ...a, ...updates, updatedAt: Date.now() } : a
-      );
-      state.save();
-      return { apps };
-    });
+      ),
+    }));
+    get().save();
   },
 
   getApp: (id) => {
