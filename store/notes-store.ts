@@ -81,14 +81,25 @@ export const useNotesStore = create<NotesState>((set, get) => ({
           id: generateUUID(),
           type: "note",
           title: "Getting Started",
-          content: `# Getting Started\n\nSee [[Welcome to Notewise]] for an overview.\n\n## Creating Notes\nTap the **+** button on the Notes tab.\n\n## Linking Notes\nType \`[[\` anywhere in a note to get a list of existing notes to link to.\n\n## Code Files\nCreate a code file from the **+** menu to get syntax-highlighted editing.\n`,
+          content: `# Getting Started\n\nSee [[Welcome to Notewise]] for an overview.\n\n## Creating Notes\nTap the **+** button on the Notes tab.\n\n## Linking Notes\nType \`[[\` anywhere in a note to get a list of existing notes to link to.\n\n## Code Files\nCreate a code file from the **+** menu to get syntax-highlighted editing.\n\n## Git Help\nNeed help setting up Git in Termux? See [[Git Setup in Termux]].\n`,
           parentId: null,
           tags: ["guide"],
           pinned: false,
           createdAt: Date.now() - 1000,
           updatedAt: Date.now() - 1000,
         };
-        const items = [welcome, gettingStarted];
+        const gitSetup: NoteItem = {
+          id: generateUUID(),
+          type: "note",
+          title: "Git Setup in Termux",
+          content: `# Git Setup in Termux\n\nIf Git asks for your **user.name** and **user.email**, those are the identity values Git writes into each commit.\n\n## What they are\n- **user.name**: the name you want Git to show on your commits\n- **user.email**: the email address you want Git to attach to your commits\n\n## Where to find them\n- Use the same name you want people to see on GitHub commits\n- Use the email from your GitHub account under **Settings → Emails**\n- If you keep your email private on GitHub, use your GitHub **noreply** email instead\n\n## Check your current values\n\`\`\`sh\ngit config --global user.name\ngit config --global user.email\n\`\`\`\n\n## Set them in Termux\n\`\`\`sh\ngit config --global user.name "Your Name"\ngit config --global user.email "you@example.com"\n\`\`\`\n`,
+          parentId: null,
+          tags: ["git", "termux"],
+          pinned: false,
+          createdAt: Date.now() - 2000,
+          updatedAt: Date.now() - 2000,
+        };
+        const items = [welcome, gettingStarted, gitSetup];
         set({ items, loaded: true });
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items));
         get().rebuildBacklinks();
